@@ -1,0 +1,904 @@
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
+
+// --- GAME CONSTANTS ---
+
+const GRID_SIZE = 6;
+const NUM_COLORS = 5;
+const MIN_MATCH_SIZE = 3;
+const DEFAULT_THEME_ID = 'classic';
+const CLEAR_DELAY = 300; // Pause after clearing blocks
+const ANIMATION_DURATION = 500; // Duration of the drop animation (must match CSS)
+
+// Level Configuration: Target score increases and moves decrease per level
+const LEVELS = [
+    { level: 1, targetScore: 200, maxMoves: 30 },
+    { level: 2, targetScore: 400, maxMoves: 25 },
+    { level: 3, targetScore: 650, maxMoves: 20 },
+    { level: 4, targetScore: 900, maxMoves: 18 },
+    { level: 5, targetScore: 1200, maxMoves: 15 },
+];
+const MAX_LEVEL = LEVELS.length;
+
+// --- THEME DEFINITIONS ---
+const THEMES = {
+    'classic': {
+        name: 'Classic',
+        background: 'bg-gray-900', // Global background
+        accent: 'text-white',      // Main title/text color
+        primaryColor: 'text-indigo-400', // Highlight color (score, selected border)
+        gridBg: '#2D3748',         // Inner grid color (Tailwind gray-700 equivalent)
+        colors: [
+            { id: 1, name: 'Red', class: 'bg-red-500 hover:bg-red-400', preview: 'bg-red-500' },
+            { id: 2, name: 'Blue', class: 'bg-blue-500 hover:bg-blue-400', preview: 'bg-blue-500' },
+            { id: 3, name: 'Green', class: 'bg-green-500 hover:bg-green-400', preview: 'bg-green-500' },
+            { id: 4, name: 'Yellow', class: 'bg-yellow-500 hover:bg-yellow-400', preview: 'bg-yellow-500' },
+            { id: 5, name: 'Purple', class: 'bg-purple-600 hover:bg-purple-500', preview: 'bg-purple-600' },
+        ],
+    },
+    'neon': {
+        name: 'Electric Neon',
+        background: 'bg-black',
+        accent: 'text-cyan-400',
+        primaryColor: 'text-lime-400',
+        gridBg: '#050505',
+        colors: [
+            { id: 1, name: 'Fuchsia', class: 'bg-fuchsia-400 hover:bg-fuchsia-300', preview: 'bg-fuchsia-400' },
+            { id: 2, name: 'Cyan', class: 'bg-cyan-400 hover:bg-cyan-300', preview: 'bg-cyan-400' },
+            { id: 3, name: 'Lime', class: 'bg-lime-400 hover:bg-lime-300', preview: 'bg-lime-400' },
+            { id: 4, name: 'Amber', class: 'bg-amber-400 hover:bg-amber-300', preview: 'bg-amber-400' },
+            { id: 5, name: 'Violet', class: 'bg-violet-400 hover:bg-violet-300', preview: 'bg-violet-400' },
+        ],
+    },
+    'earth': {
+        name: 'Earth Tones',
+        background: 'bg-amber-100', // Light background
+        accent: 'text-gray-800',
+        primaryColor: 'text-teal-700',
+        gridBg: '#E9E9E9',
+        colors: [
+            { id: 1, name: 'Terracotta', class: 'bg-orange-700 hover:bg-orange-600', preview: 'bg-orange-700' },
+            { id: 2, name: 'Teal', class: 'bg-teal-700 hover:bg-teal-600', preview: 'bg-teal-700' },
+            { id: 3, name: 'Olive', class: 'bg-lime-700 hover:bg-lime-600', preview: 'bg-lime-700' },
+            { id: 4, name: 'Sand', class: 'bg-amber-700 hover:bg-amber-600', preview: 'bg-amber-700' },
+            { id: 5, name: 'Slate', class: 'bg-slate-700 hover:bg-slate-600', preview: 'bg-slate-700' },
+        ],
+    },
+    'upside_down': {
+        name: 'Upside Down',
+        background: 'bg-black',
+        accent: 'text-red-700',    // Deep red for titles
+        primaryColor: 'text-orange-500', // Orange for highlights
+        gridBg: '#1A0000',         // Very dark red inner grid
+        colors: [
+            { id: 1, name: 'Crimson', class: 'bg-red-900 hover:bg-red-800', preview: 'bg-red-900' },
+            { id: 2, name: 'Ash', class: 'bg-gray-800 hover:bg-gray-700', preview: 'bg-gray-800' },
+            { id: 3, name: 'Moss', class: 'bg-green-900 hover:bg-green-800', preview: 'bg-green-900' },
+            { id: 4, name: 'Muted Yellow', class: 'bg-yellow-700 hover:bg-yellow-600', preview: 'bg-yellow-700' },
+            { id: 5, name: 'Violet Black', class: 'bg-purple-900 hover:bg-purple-800', preview: 'bg-purple-900' },
+        ],
+    },
+};
+
+const getRandomColorId = () => Math.floor(Math.random() * NUM_COLORS) + 1;
+const initialGrid = () => Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0).map(getRandomColorId));
+
+
+// --- FIREBASE HOOK ---
+
+const useFirebase = () => {
+    const [db, setDb] = useState(null);
+    const [userId, setUserId] = useState(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
+    const [highScore, setHighScore] = useState(0);
+    const [currentThemeId, setCurrentThemeId] = useState(DEFAULT_THEME_ID);
+
+    const firebaseContext = useMemo(() => {
+        if (db && userId) {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            return {
+                highScoresPath: doc(db, 'artifacts', appId, 'users', userId, 'kc_flow_high_scores', 'main_score'),
+                themePath: doc(db, 'artifacts', appId, 'users', userId, 'kc_flow_settings', 'theme'),
+            };
+        }
+        return {};
+    }, [db, userId]);
+
+    // Initialize Firebase
+    useEffect(() => {
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        if (!firebaseConfig) {
+            console.error("Firebase configuration not available.");
+            setIsAuthReady(true);
+            return;
+        }
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const firestore = getFirestore(app);
+            const firebaseAuth = getAuth(app);
+
+            setDb(firestore);
+
+            const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+                if (user) {
+                    setUserId(user.uid);
+                } else {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(firebaseAuth, initialAuthToken).catch(e => {
+                            console.error("Custom token sign-in failed:", e);
+                            signInAnonymously(firebaseAuth).catch(err => console.error("Anonymous sign-in failed:", err));
+                        });
+                    } else {
+                        await signInAnonymously(firebaseAuth).catch(err => console.error("Anonymous sign-in failed:", err));
+                    }
+                }
+                setIsAuthReady(true);
+            });
+
+            return () => unsubscribe();
+        } catch (error) {
+            console.error("Firebase Initialization Error:", error);
+            setIsAuthReady(true);
+        }
+    }, []);
+    
+    // --- High Score Listener ---
+    useEffect(() => {
+        const path = firebaseContext.highScoresPath;
+        if (!path) return;
+
+        const unsubscribe = onSnapshot(path, (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const data = docSnapshot.data();
+                setHighScore(data.score || 0);
+            }
+        }, (error) => console.error("Error listening to high score:", error));
+
+        return () => unsubscribe();
+    }, [firebaseContext.highScoresPath]);
+
+    // --- Theme Listener ---
+    useEffect(() => {
+        const path = firebaseContext.themePath;
+        if (!path) return;
+
+        const unsubscribe = onSnapshot(path, (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const data = docSnapshot.data();
+                setCurrentThemeId(data.id || DEFAULT_THEME_ID);
+            } else {
+                // If no theme is saved, save the default theme
+                if (userId) {
+                    setDoc(path, { id: DEFAULT_THEME_ID }, { merge: true }).catch(e => console.error("Error setting default theme:", e));
+                }
+            }
+        }, (error) => console.error("Error listening to theme:", error));
+
+        return () => unsubscribe();
+    }, [firebaseContext.themePath, userId]);
+
+    // --- Save Functions ---
+    const saveTheme = useCallback((themeId) => {
+        const path = firebaseContext.themePath;
+        if (path) {
+            setCurrentThemeId(themeId);
+            setDoc(path, { id: themeId }, { merge: true }).catch(e => console.error("Error saving theme:", e));
+        }
+    }, [firebaseContext.themePath]);
+
+    const saveHighScore = useCallback((score) => {
+        const path = firebaseContext.highScoresPath;
+        if (path) {
+            setHighScore(score);
+            setDoc(path, { score: score }, { merge: true }).catch(e => console.error("Error saving high score:", e));
+        }
+    }, [firebaseContext.highScoresPath]);
+
+
+    return { userId, isAuthReady, highScore, saveHighScore, currentThemeId, saveTheme };
+};
+
+// --- GAME LOGIC HOOK ---
+
+const useGameLogic = (highScore, saveHighScore, setGameState) => {
+    const [grid, setGrid] = useState(initialGrid);
+    const [mode, setMode] = useState('classic'); // 'classic' or 'levels'
+    const [score, setScore] = useState(0); // Current level score (or total score in classic)
+    const [totalScore, setTotalScore] = useState(0); // Total accumulated score (Levels mode only)
+    const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
+    const [movesLeft, setMovesLeft] = useState(0);
+    const [message, setMessage] = useState('Click a block to clear matching groups (min 3)!');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [highlightedGroup, setHighlightedGroup] = useState(null);
+    const [dropMap, setDropMap] = useState({}); // { 'r,c': dropDistanceInCells }
+
+    // Current level configuration (or null for classic mode)
+    const currentLevelConfig = LEVELS[currentLevelIndex];
+    const targetScore = currentLevelConfig ? currentLevelConfig.targetScore : null;
+
+    // Update High Score on local state change (always based on the highest score achieved)
+    useEffect(() => {
+        const scoreToCheck = mode === 'levels' ? totalScore : score;
+        if (scoreToCheck > highScore) {
+            saveHighScore(scoreToCheck);
+        }
+    }, [score, totalScore, highScore, saveHighScore, mode]);
+
+
+    // --- Core Game Functions (Memoized) ---
+
+    const findContiguousGroup = useCallback((r, c, currentGrid) => {
+        const targetId = currentGrid[r][c];
+        if (targetId === 0) return [];
+
+        const queue = [[r, c]];
+        const group = new Set();
+        const visited = new Set();
+
+        const key = (row, col) => `${row},${col}`;
+
+        while (queue.length > 0) {
+            const [row, col] = queue.shift();
+            const cellKey = key(row, col);
+
+            if (visited.has(cellKey)) continue;
+            visited.add(cellKey);
+
+            if (currentGrid[row][col] === targetId) {
+                group.add(cellKey);
+
+                // Check neighbors: Up, Down, Left, Right
+                [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
+                    const nr = row + dr;
+                    const nc = col + dc;
+
+                    if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+                        const neighborKey = key(nr, nc);
+                        if (currentGrid[nr][nc] === targetId && !visited.has(neighborKey)) {
+                            queue.push([nr, nc]);
+                        }
+                    }
+                });
+            }
+        }
+        return Array.from(group).map(k => k.split(',').map(Number));
+    }, []);
+
+    // New function to combine gravity application and drop calculation
+    const calculateDrops = useCallback((clearedGrid) => {
+        let drops = {};
+        // Use a temporary grid to simulate gravity and determine final positions
+        let gridAfterGravity = clearedGrid.map(row => [...row]);
+
+        for (let c = 0; c < GRID_SIZE; c++) {
+            let writeRow = GRID_SIZE - 1;
+            for (let r = GRID_SIZE - 1; r >= 0; r--) {
+                if (clearedGrid[r][c] !== 0) {
+                    const dropDistance = writeRow - r;
+                    if (dropDistance > 0) {
+                        drops[`${r},${c}`] = dropDistance;
+                        // Move block in the simulated grid
+                        gridAfterGravity[writeRow][c] = clearedGrid[r][c];
+                        gridAfterGravity[r][c] = 0;
+                    }
+                    writeRow--;
+                }
+            }
+        }
+        // NOTE: The rows at the top (r < writeRow) will be 0s, ready for refill
+        return { gridAfterGravity, drops };
+    }, []);
+
+    const refillGrid = useCallback((currentGrid) => {
+        let newGrid = currentGrid.map(row => [...row]);
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                if (newGrid[r][c] === 0) {
+                    newGrid[r][c] = getRandomColorId();
+                }
+            }
+        }
+        return newGrid;
+    }, []);
+    
+    const checkGameOver = useCallback((currentGrid) => {
+        // Only used for Classic Mode: checks if any move is possible
+        if (mode === 'levels') return false; 
+        
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                const group = findContiguousGroup(r, c, currentGrid);
+                if (group.length >= MIN_MATCH_SIZE) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }, [findContiguousGroup, mode]);
+
+
+    // --- Level Progression ---
+
+    const goToNextLevel = useCallback(() => {
+        const nextIndex = currentLevelIndex + 1;
+        if (nextIndex < MAX_LEVEL) {
+            setCurrentLevelIndex(nextIndex);
+            setScore(0); // Reset score for the new level
+            setMovesLeft(LEVELS[nextIndex].maxMoves);
+            setGrid(initialGrid()); // New grid for the next level
+            setMessage(`Level ${nextIndex + 1} started! Reach ${LEVELS[nextIndex].targetScore} points!`);
+            setGameState('playing');
+        }
+    }, [currentLevelIndex, setGameState]);
+
+
+    // --- Main Click Handler ---
+
+    const handleCellClick = async (r, c) => {
+        if (isProcessing || grid[r][c] === 0) return;
+
+        setIsProcessing(true);
+        setHighlightedGroup(null);
+
+        const group = findContiguousGroup(r, c, grid);
+        const groupSize = group.length;
+
+        if (groupSize < MIN_MATCH_SIZE) {
+            setMessage(`Needs at least ${MIN_MATCH_SIZE} blocks to clear. Only found ${groupSize}.`);
+            setIsProcessing(false);
+            return;
+        }
+
+        const points = groupSize * 10;
+
+        // 1. Update Score/Moves immediately for UI feedback
+        setScore(s => s + points);
+        setTotalScore(ts => mode === 'levels' ? ts + points : ts);
+        setMessage(`Cleared ${groupSize} blocks for +${points} points!`);
+        if (mode === 'levels') {
+            setMovesLeft(m => m - 1);
+        }
+
+        // 2. Clear the group (Set to 0) in a temporary grid and show clearance
+        let gridAfterClear = grid.map(row => [...row]);
+        group.forEach(([gr, gc]) => {
+            gridAfterClear[gr][gc] = 0;
+        });
+        setGrid(gridAfterClear);
+        
+        // Wait to show cleared state
+        await new Promise(resolve => setTimeout(resolve, CLEAR_DELAY)); 
+
+        // 3. Calculate drops and get the gravity-applied grid
+        const { gridAfterGravity, drops } = calculateDrops(gridAfterClear);
+        
+        // 4. Start Animation
+        if (Object.keys(drops).length > 0) {
+            setDropMap(drops);
+            // Wait for the animation to complete (ANIMATION_DURATION + buffer)
+            await new Promise(resolve => setTimeout(resolve, ANIMATION_DURATION + 100)); 
+            setDropMap({}); // Clear drop map
+        }
+        
+        // 5. Update Grid state to the final gravity position
+        setGrid(gridAfterGravity); 
+
+        // 6. Refill
+        await new Promise(resolve => setTimeout(resolve, CLEAR_DELAY)); 
+        const gridAfterRefill = refillGrid(gridAfterGravity);
+        setGrid(gridAfterRefill);
+        
+        // 7. Check Game State (use latest state values after all updates)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        setScore(latestScore => {
+            const newScore = latestScore;
+            
+            if (mode === 'levels') {
+                setMovesLeft(latestMoves => {
+                    const newMovesLeft = latestMoves;
+                    
+                    if (newScore >= targetScore) {
+                        // Level Win
+                        const isLastLevel = currentLevelIndex === MAX_LEVEL - 1;
+                        if (isLastLevel) {
+                            setMessage(`You beat all ${MAX_LEVEL} levels! Total Score: ${totalScore + points}.`);
+                            setGameState('gameover');
+                        } else {
+                            setMessage(`Level ${currentLevelIndex + 1} COMPLETE! Total Score: ${totalScore + points}.`);
+                            setGameState('levelwin');
+                        }
+                    } else if (newMovesLeft <= 0) {
+                        // Level Loss
+                        setMessage(`Level ${currentLevelIndex + 1} Failed! Ran out of moves. Total Score: ${totalScore + points}.`);
+                        setGameState('gameover');
+                    }
+                    return latestMoves; // No change in setter
+                });
+            } else {
+                // Classic Mode Game Over
+                if (checkGameOver(gridAfterRefill)) {
+                    setMessage(`Game Over! Final Score: ${newScore}. No more moves!`);
+                    setGameState('gameover');
+                }
+            }
+            return latestScore; // No change in setter
+        });
+
+
+        setIsProcessing(false);
+    };
+    
+    const handleCellHover = (r, c) => {
+        if (isProcessing || grid[r][c] === 0) {
+            setHighlightedGroup(null);
+            return;
+        }
+        const group = findContiguousGroup(r, c, grid);
+        if (group.length >= MIN_MATCH_SIZE) {
+            setHighlightedGroup(group);
+        } else {
+            setHighlightedGroup(null);
+        }
+    }
+
+    const startGame = (gameMode) => {
+        setMode(gameMode);
+        setGrid(initialGrid());
+        setScore(0);
+        setTotalScore(0);
+        setCurrentLevelIndex(0);
+        setDropMap({});
+        
+        if (gameMode === 'levels') {
+            setMovesLeft(LEVELS[0].maxMoves);
+            setMessage(`Level 1: Reach ${LEVELS[0].targetScore} points!`);
+        } else {
+            setMessage('Click a block to clear matching groups (min 3)!');
+        }
+        
+        setGameState('playing');
+    };
+
+    return { 
+        grid, 
+        score, 
+        totalScore, 
+        highScore, 
+        message, 
+        isProcessing, 
+        highlightedGroup, 
+        mode,
+        currentLevelConfig,
+        movesLeft,
+        dropMap, // <-- Export new state
+        handleCellClick, 
+        handleCellHover, 
+        startGame, 
+        goToNextLevel
+    };
+};
+
+// --- REACT COMPONENT ---
+
+// Utility component for styling the main buttons
+const BaseButton = ({ children, onClick, color = 'bg-indigo-600', hover = 'hover:bg-indigo-700', disabled = false }) => (
+    <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`w-full py-4 px-8 text-white font-bold rounded-xl text-xl 
+                    ${color} ${hover} shadow-xl transition-all duration-300 transform 
+                    hover:scale-[1.03] active:scale-[0.98] 
+                    disabled:bg-gray-700 disabled:opacity-70`}
+    >
+        {children}
+    </button>
+);
+
+
+// --- SCREEN COMPONENTS ---
+
+const MenuScreen = ({ startGame, setGameState, highScore, currentTheme }) => (
+    <div className="flex flex-col space-y-6 w-full max-w-sm text-center">
+        {/* Game Name - Uses theme accent color */}
+        <h2 className={`text-6xl font-black mb-6 tracking-tighter ${currentTheme.accent}`}>KC FLOW</h2>
+        
+        {/* Mode Selectors */}
+        <div className="space-y-4">
+            <BaseButton onClick={() => startGame('classic')} color="bg-green-500" hover="hover:bg-green-600">
+                CLASSIC MODE (Endless)
+            </BaseButton>
+            <BaseButton onClick={() => startGame('levels')} color="bg-purple-600" hover="hover:bg-purple-700">
+                LEVELS MODE (Progressive)
+            </BaseButton>
+        </div>
+        
+        {/* Settings */}
+        <BaseButton onClick={() => setGameState('settings')} color="bg-gray-700" hover="hover:bg-gray-600">
+            SETTINGS
+        </BaseButton>
+
+        <div className="text-center pt-4 text-gray-500 font-semibold">Highest Score: {highScore}</div>
+    </div>
+);
+
+const SettingsScreen = ({ setGameState, userId, currentThemeId, saveTheme, currentTheme }) => {
+    const themeKeys = Object.keys(THEMES);
+
+    return (
+        <div className={`flex flex-col space-y-6 w-full max-w-sm p-8 rounded-2xl shadow-2xl ${currentTheme.background === 'bg-black' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} shadow-lg`}>
+            <h2 className="text-3xl font-bold border-b pb-3 border-gray-700">Settings</h2>
+            
+            <div className="space-y-4">
+                <h3 className="text-xl font-semibold">Color Theme</h3>
+                <div className="grid grid-cols-1 gap-3">
+                    {themeKeys.map(themeId => {
+                        const theme = THEMES[themeId];
+                        const isSelected = themeId === currentThemeId;
+
+                        const primaryColorTailwind = currentTheme.primaryColor.replace('text-', 'border-');
+                        
+                        return (
+                            <div
+                                key={themeId}
+                                onClick={() => saveTheme(themeId)}
+                                className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border-2 
+                                            ${isSelected ? `${primaryColorTailwind} bg-gray-700 shadow-lg text-white` : 'border-gray-700 hover:bg-gray-700/50 text-gray-300'}`}
+                            >
+                                <span className="font-semibold">{theme.name}</span>
+                                <div className="flex space-x-1">
+                                    {theme.colors.map((color, index) => (
+                                        <div key={index} className={`w-4 h-4 rounded-full ${color.preview} shadow-sm`} />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-gray-700">
+                <h3 className="text-xl font-semibold">User Data</h3>
+                <div className="p-4 bg-gray-700 rounded-lg break-words text-gray-400">
+                    <p className="text-sm font-light mb-1">Authenticated User ID:</p>
+                    <p className="font-mono text-xs text-white">{userId || 'Loading...'}</p>
+                </div>
+            </div>
+            
+            <BaseButton 
+                onClick={() => setGameState('menu')} 
+                color="bg-red-500" 
+                hover="hover:bg-red-600"
+            >
+                Back to Menu
+            </BaseButton>
+        </div>
+    );
+};
+
+const LevelWinScreen = ({ currentLevelIndex, totalScore, goToNextLevel, setGameState, currentTheme }) => {
+    const isFinalLevel = currentLevelIndex === MAX_LEVEL - 1;
+    
+    return (
+        <div className="flex flex-col space-y-6 w-full max-w-sm text-center p-6 bg-gray-800/80 rounded-xl shadow-2xl">
+            <h2 className={`text-5xl font-black mb-2 tracking-tighter ${currentTheme.primaryColor}`}>LEVEL {currentLevelIndex + 1} CLEARED!</h2>
+            <p className="text-xl font-semibold text-gray-300">Total Score: <span className={`font-black ${currentTheme.primaryColor}`}>{totalScore}</span></p>
+            
+            {isFinalLevel ? (
+                <p className="text-2xl text-green-400 font-bold">You Beat the Game!</p>
+            ) : (
+                <p className="text-xl text-white font-semibold">Next Challenge: Level {currentLevelIndex + 2}</p>
+            )}
+            
+            <BaseButton 
+                onClick={isFinalLevel ? () => setGameState('menu') : goToNextLevel} 
+                color={isFinalLevel ? "bg-indigo-600" : "bg-green-500"} 
+                hover={isFinalLevel ? "hover:bg-indigo-700" : "hover:bg-green-600"}
+            >
+                {isFinalLevel ? 'RETURN TO MENU' : 'CONTINUE'}
+            </BaseButton>
+        </div>
+    );
+}
+
+const GameOverScreen = ({ score, highScore, startGame, setGameState, currentTheme, mode, totalScore }) => {
+    // Score calculation reflects the state updates in handleCellClick
+    const finalScore = mode === 'levels' ? totalScore : score;
+    const modeName = mode === 'levels' ? 'Levels Mode' : 'Classic Mode';
+
+    return (
+        <div className="flex flex-col space-y-6 w-full max-w-sm text-center">
+            {/* Game Over Title uses theme accent color */}
+            <h2 className={`text-6xl font-black mb-2 tracking-tighter ${currentTheme.accent}`}>GAME OVER</h2>
+            <p className="text-xl font-medium text-gray-400">{modeName}</p>
+            
+            {/* Final Score uses theme primary color */}
+            <p className={`text-3xl font-semibold text-gray-300`}>
+                Final Score: <span className={`font-black ${currentTheme.primaryColor}`}>{finalScore}</span>
+            </p>
+            <p className="text-xl text-gray-500">Highest Score: {highScore}</p>
+            
+            <BaseButton 
+                onClick={() => startGame(mode)} // Restart the same mode
+                color="bg-green-500" 
+                hover="hover:bg-green-600"
+            >
+                PLAY AGAIN
+            </BaseButton>
+            <BaseButton 
+                onClick={() => setGameState('menu')} 
+                color="bg-gray-700" 
+                hover="hover:bg-gray-600"
+            >
+                Back to Menu
+            </BaseButton>
+        </div>
+    );
+};
+
+
+const GameUI = ({ 
+    grid, 
+    score, 
+    totalScore,
+    highScore, 
+    message, 
+    isProcessing, 
+    highlightedGroup, 
+    handleCellClick, 
+    handleCellHover, 
+    setGameState, 
+    COLORS_MAP, 
+    currentTheme,
+    mode,
+    currentLevelConfig,
+    movesLeft,
+    dropMap // <-- New prop
+}) => {
+    
+    const getColorClass = (id) => COLORS_MAP.find(c => c.id === id)?.class || 'bg-transparent';
+    const key = (r, c) => `${r},${c}`;
+    const isHighlighted = (r, c) => highlightedGroup && highlightedGroup.some(([hr, hc]) => hr === r && hc === c);
+    
+    // Icon Button for returning to the Menu
+    const IconButton = ({ onClick, children, className = '' }) => (
+        <button 
+          onClick={onClick} 
+          className={`p-3 rounded-full bg-white/10 backdrop-blur-sm text-white 
+                      transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg ${className}`}
+          aria-label="Action Button"
+        >
+            {children}
+        </button>
+    );
+    
+    // Determine the score to display based on mode
+    const scoreToDisplay = mode === 'levels' ? totalScore : score;
+    const scoreLabel = mode === 'levels' ? 'Total' : 'Score';
+
+    // Calculate progress for Levels Mode
+    const progress = mode === 'levels' && currentLevelConfig 
+        ? Math.min(100, (score / currentLevelConfig.targetScore) * 100)
+        : 0;
+
+    return (
+        <div className="w-full max-w-sm mx-auto flex flex-col items-center">
+            
+            {/* Top Bar: Level, Score, Moves */}
+            <div className="flex justify-between items-center w-full mb-6 px-2">
+                 {/* Menu Button */}
+                <IconButton onClick={() => setGameState('menu')}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </IconButton>
+
+                {/* Central Info (Score / Level) */}
+                <div className="flex flex-col items-center p-3 rounded-xl bg-white/10 backdrop-blur-sm shadow-xl min-w-[120px]">
+                    <div className="text-xs font-bold text-gray-200 uppercase">{scoreLabel}</div>
+                    <div className={`text-3xl font-extrabold ${currentTheme.primaryColor}`}>{scoreToDisplay}</div>
+                    <div className="text-[10px] font-semibold text-gray-400 mt-1">High: {highScore}</div>
+                </div>
+                
+                {/* Right Side (Moves Left / Level #) */}
+                {mode === 'levels' && currentLevelConfig ? (
+                    <div className="flex flex-col items-center p-3 rounded-xl bg-white/10 backdrop-blur-sm shadow-xl min-w-[80px]">
+                         <div className="text-xs font-bold text-gray-200 uppercase">Level</div>
+                        <div className={`text-3xl font-extrabold ${currentTheme.primaryColor}`}>{currentLevelConfig.level}</div>
+                        <div className="text-[10px] font-semibold text-gray-400 mt-1">Moves: {movesLeft}</div>
+                    </div>
+                ) : (
+                    <div className="w-10 h-10 opacity-0"></div> 
+                )}
+            </div>
+            
+            {/* Levels Mode Progress Bar */}
+            {mode === 'levels' && currentLevelConfig && (
+                <div className="w-full mb-4">
+                    <div className="text-sm font-semibold text-gray-300 mb-1 flex justify-between">
+                        <span>Current: {score} / {currentLevelConfig.targetScore} Pts</span>
+                        <span className={`font-bold ${progress >= 100 ? 'text-green-400' : 'text-gray-400'}`}>{Math.floor(progress)}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full rounded-full transition-all duration-500 ease-out ${currentTheme.primaryColor.replace('text-', 'bg-')}`} 
+                            style={{ width: `${progress}%` }}
+                        ></div>
+                    </div>
+                </div>
+            )}
+
+
+            {/* Message Box */}
+            <div className={`mb-4 p-3 w-full text-center text-sm font-semibold rounded-lg bg-white/10 backdrop-blur-sm shadow-md text-gray-300`}>
+                <p className={`transition-colors`}>
+                    {message}
+                </p>
+            </div>
+
+            {/* Game Grid */}
+            <div 
+                className="p-1 rounded-lg shadow-inner shadow-black/70 transition-colors mx-auto w-full"
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
+                    gap: '4px',
+                    aspectRatio: '1 / 1',
+                    backgroundColor: currentTheme.gridBg, // Themed inner background
+                }}
+            >
+                {grid.flat().map((id, index) => {
+                    const r = Math.floor(index / GRID_SIZE);
+                    const c = index % GRID_SIZE;
+                    const colorClass = getColorClass(id);
+                    const cellKey = key(r, c);
+                    const dropDistance = dropMap[cellKey]; // Drop distance in cells
+                    
+                    let cellClass = 'w-full h-full rounded-lg shadow-md transition-all duration-500 ease-in-out transform';
+
+                    if (id === 0) {
+                        cellClass += ' bg-transparent scale-0';
+                    } else {
+                        cellClass += ` ${colorClass} cursor-pointer`;
+
+                        if (isHighlighted(r, c)) {
+                            // Use primary color for highlight ring
+                            cellClass += ` ring-4 ring-offset-2 ring-offset-[${currentTheme.gridBg}] ${currentTheme.primaryColor.replace('text-', 'ring-')} scale-[1.05] shadow-2xl`;
+                        } else if (!isProcessing) {
+                            cellClass += ' active:scale-[0.9]';
+                        }
+                    }
+                    
+                    // Animation Style: Block is currently dropping
+                    const animationStyle = {
+                        transform: dropDistance 
+                            ? `translateY(calc(${dropDistance} * (100% + 4px)))` // 100% + 4px gap per cell
+                            : 'translateY(0)',
+                        // Set transition duration to match the logic delay
+                        transitionDuration: `${ANIMATION_DURATION}ms`,
+                    };
+
+
+                    return (
+                        <div
+                            key={cellKey}
+                            className={cellClass}
+                            onClick={() => handleCellClick(r, c)}
+                            onMouseEnter={() => handleCellHover(r, c)}
+                            onMouseLeave={() => highlightedGroup && highlightedGroup.length >= MIN_MATCH_SIZE && setHighlightedGroup(null)}
+                            style={{
+                                gridRow: `${r + 1} / span 1`,
+                                gridColumn: `${c + 1} / span 1`,
+                                transitionProperty: 'transform, background-color, box-shadow, ring',
+                                ...animationStyle, // Apply animation transform
+                            }}
+                        >
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+
+const App = () => {
+    const [gameState, setGameState] = useState('menu'); // 'menu', 'playing', 'settings', 'gameover', 'levelwin'
+    const { userId, isAuthReady, highScore, saveHighScore, currentThemeId, saveTheme } = useFirebase();
+    const { 
+        grid, 
+        score,
+        totalScore, 
+        message, 
+        isProcessing, 
+        highlightedGroup, 
+        mode,
+        currentLevelConfig,
+        movesLeft,
+        dropMap,
+        handleCellClick, 
+        handleCellHover, 
+        startGame,
+        goToNextLevel
+    } = useGameLogic(highScore, saveHighScore, setGameState);
+    
+    // Determine the active theme objects
+    const currentTheme = THEMES[currentThemeId] || THEMES[DEFAULT_THEME_ID];
+    const COLORS_MAP = currentTheme.colors;
+
+    if (!isAuthReady) {
+        return (
+            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+                <p className="text-white text-xl animate-pulse">Initializing Game & User...</p>
+            </div>
+        );
+    }
+
+    const renderScreen = () => {
+        switch (gameState) {
+            case 'menu':
+                return <MenuScreen startGame={startGame} setGameState={setGameState} highScore={highScore} currentTheme={currentTheme} />;
+            case 'settings':
+                return <SettingsScreen 
+                            setGameState={setGameState} 
+                            userId={userId} 
+                            currentThemeId={currentThemeId} 
+                            saveTheme={saveTheme} 
+                            currentTheme={currentTheme}
+                        />;
+            case 'playing':
+                return <GameUI 
+                            grid={grid} 
+                            score={score} 
+                            totalScore={totalScore}
+                            highScore={highScore} 
+                            message={message} 
+                            isProcessing={isProcessing} 
+                            highlightedGroup={highlightedGroup} 
+                            handleCellClick={handleCellClick} 
+                            handleCellHover={handleCellHover}
+                            setGameState={setGameState} 
+                            COLORS_MAP={COLORS_MAP}
+                            currentTheme={currentTheme}
+                            mode={mode}
+                            currentLevelConfig={currentLevelConfig}
+                            movesLeft={movesLeft}
+                            dropMap={dropMap}
+                        />;
+            case 'levelwin':
+                // Note: We use totalScore + score because score is local to the level
+                const actualTotalScore = totalScore + score;
+                return <LevelWinScreen 
+                            currentLevelIndex={currentLevelConfig.level - 1}
+                            totalScore={actualTotalScore}
+                            goToNextLevel={goToNextLevel}
+                            setGameState={setGameState}
+                            currentTheme={currentTheme}
+                        />;
+            case 'gameover':
+                return <GameOverScreen 
+                            score={score} 
+                            totalScore={totalScore}
+                            highScore={highScore} 
+                            startGame={startGame} 
+                            setGameState={setGameState} 
+                            currentTheme={currentTheme}
+                            mode={mode}
+                        />;
+            default:
+                return <MenuScreen startGame={startGame} setGameState={setGameState} highScore={highScore} currentTheme={currentTheme} />;
+        }
+    };
+
+    return (
+        // Apply the global background class from the active theme here
+        <div className={`min-h-screen ${currentTheme.background} flex flex-col items-center justify-center p-4 font-inter dark`}>
+            {renderScreen()}
+        </div>
+    );
+};
+
+export default App;
