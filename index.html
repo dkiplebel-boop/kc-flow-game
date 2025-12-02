@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Link</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for sound generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script> 
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap');
+        
+        /* --- Default Theme Variables (Dark Mode) --- */
+        :root {
+            --bg-primary: #1e1e2d;
+            --bg-secondary: #0a0a1a;
+            --ui-background: #282a36;
+            --ui-panel: #383a59;
+            --color-main: #fff;
+            --color-accent: #bd93f9;
+            --color-link: #ff79c6;
+            --color-success: #50fa7b;
+            --color-warning: #F8E71C;
+            /* Removed canvas border color */
+            --color-canvas-bg: #282a36;
+            --color-grid-line: #383a59;
+            --color-button-primary: #bd93f9;
+            --color-button-primary-shadow: #8a70b4;
+            --color-button-primary-hover: #e6a9f8;
+            --color-button-secondary: #ff79c6;
+            --color-button-secondary-shadow: #ad437f;
+            --color-button-secondary-hover: #ff99cc;
+            --color-button-menu-bg: #4b5563; /* Gray-600 */
+            --color-button-menu-shadow: #1f2937; /* Gray-800 */
+        }
+
+        /* --- Light Mode Theme --- */
+        .theme-light {
+            --bg-primary: #f0f0f5;
+            --bg-secondary: #e0e0e5;
+            --ui-background: #ffffff;
+            --ui-panel: #f0f0f0;
+            --color-main: #333;
+            --color-accent: #9013FE;
+            --color-link: #D0021B;
+            --color-success: #1E824C;
+            --color-warning: #C70039;
+            /* Removed canvas border color */
+            --color-canvas-bg: #f8f8f8;
+            --color-grid-line: #ccc;
+            --color-button-primary: #9013FE;
+            --color-button-primary-shadow: #5a0a9e;
+            --color-button-primary-hover: #a948fe;
+            --color-button-secondary: #D0021B;
+            --color-button-secondary-shadow: #9e0214;
+            --color-button-secondary-hover: #ff3349;
+            --color-button-menu-bg: #9ca3af;
+            --color-button-menu-shadow: #6b7280;
+        }
+
+        /* --- Forest Theme --- */
+        .theme-forest {
+            --bg-primary: #1a3424;
+            --bg-secondary: #0a1c12;
+            --ui-background: #2d4a34;
+            --ui-panel: #3a6042;
+            --color-main: #e0f0e0;
+            --color-accent: #7cb448;
+            --color-link: #F5A623;
+            --color-success: #b8cc9a;
+            --color-warning: #EEDD4C;
+            /* Removed canvas border color */
+            --color-canvas-bg: #2d4a34;
+            --color-grid-line: #1e3a24;
+            --color-button-primary: #7cb448;
+            --color-button-primary-shadow: #4a7824;
+            --color-button-primary-hover: #9cd468;
+            --color-button-secondary: #F5A623;
+            --color-button-secondary-shadow: #b3730e;
+            --color-button-secondary-hover: #ffd378;
+            --color-button-menu-bg: #5a7d61; 
+            --color-button-menu-shadow: #3f5e43; 
+        }
+
+        /* --- Upside Down Theme (Stranger Things) --- */
+        .theme-upside-down {
+            --bg-primary: #120a0a;
+            --bg-secondary: #000000;
+            --ui-background: #1a0f0f;
+            --ui-panel: #2e1d1d;
+            --color-main: #e0e0e0;
+            --color-accent: #e50914; /* Netflix Red */
+            --color-link: #ff4545;
+            --color-success: #ff0000;
+            --color-warning: #ffe000;
+            /* Removed canvas border color */
+            --color-canvas-bg: #1a0f0f;
+            --color-grid-line: #331f1f;
+            --color-button-primary: #e50914;
+            --color-button-primary-shadow: #96060c;
+            --color-button-primary-hover: #ff333d;
+            --color-button-secondary: #ff4545;
+            --color-button-secondary-shadow: #b22d2d;
+            --color-button-secondary-hover: #ff6666;
+            --color-button-menu-bg: #4d2626; 
+            --color-button-menu-shadow: #331a1a;
+        }
+
+        /* --- Ocean Theme --- */
+        .theme-ocean {
+            --bg-primary: #3a506b;
+            --bg-secondary: #0e1e30;
+            --ui-background: #6a8ba7;
+            --ui-panel: #839aa8;
+            --color-main: #f0f8ff;
+            --color-accent: #00bcd4; /* Cyan */
+            --color-link: #ffcd3c; /* Gold/Sand */
+            --color-success: #4caf50;
+            --color-warning: #f44336;
+            /* Removed canvas border color */
+            --color-canvas-bg: #6a8ba7;
+            --color-grid-line: #4e6c87;
+            --color-button-primary: #00bcd4;
+            --color-button-primary-shadow: #008ba3;
+            --color-button-primary-hover: #33e5ff;
+            --color-button-secondary: #ffcd3c;
+            --color-button-secondary-shadow: #c79c16;
+            --color-button-secondary-hover: #ffeb8d;
+            --color-button-menu-bg: #4682b4; /* Steel Blue */
+            --color-button-menu-shadow: #2c5374; 
+        }
+
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--color-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            transition: background 0.5s, color 0.5s;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: fit-content;
+            width: 100%;
+            background: var(--ui-background);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(71, 107, 255, 0.4);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: var(--color-accent);
+            text-shadow: 0 0 10px var(--color-accent, 0.6);
+        }
+
+        /* Modified Info Bar Styling: Removed background/padding/box-shadow */
+        #gameInfoBar {
+            color: var(--color-main);
+            width: 100%;
+            max-width: 480px;
+            padding: 10px 0; /* Minimal padding */
+            box-sizing: border-box;
+            transition: color 0.5s;
+        }
+        #gameInfoBar button {
+            /* Kept button styling for visibility/interactivity */
+            background: var(--color-button-secondary);
+            box-shadow: 0 3px var(--color-button-secondary-shadow);
+            color: var(--ui-background);
+        }
+        #gameInfoBar button:hover {
+            background: var(--color-button-secondary-hover);
+        }
+
+        /* Removed border and associated box-shadow for a simpler look */
+        #gameCanvas {
+            box-shadow: 0 0 20px rgba(248, 248, 242, 0.2);
+            border-radius: 10px; /* Kept subtle corner rounding */
+            background-color: var(--color-canvas-bg);
+            touch-action: none;
+            transition: background 0.5s;
+            border: none; /* Explicitly removed border */
+        }
+
+        .btn {
+            background: var(--color-button-primary);
+            color: var(--ui-background);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 4px var(--color-button-primary-shadow);
+            border: none;
+        }
+        .btn-menu {
+            background: var(--color-button-menu-bg);
+            box-shadow: 0 4px var(--color-button-menu-shadow);
+            color: var(--color-main);
+        }
+        .btn-menu:hover {
+            background: var(--color-button-menu-bg, 0.8);
+            box-shadow: 0 4px var(--color-button-menu-shadow);
+        }
+
+        .btn:hover {
+            background: var(--color-button-primary-hover);
+        }
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px var(--color-button-primary-shadow);
+        }
+        
+        /* Modal and Settings Styling */
+        #gameModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .modal-background {
+             background: var(--ui-panel);
+             transition: background 0.5s;
+        }
+
+        #modalContentContainer h2 {
+            color: var(--color-link);
+            text-shadow: 0 0 5px rgba(255, 121, 198, 0.4);
+        }
+        
+        .toggle-switch {
+            width: 50px;
+            height: 25px;
+            background: #ccc;
+            border-radius: 25px;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .toggle-switch.active {
+            background: var(--color-success);
+        }
+        .toggle-switch:before {
+            content: '';
+            position: absolute;
+            width: 21px;
+            height: 21px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        .toggle-switch.active:before {
+            transform: translateX(25px);
+        }
+        
+        /* Theme button active style */
+        .active-theme {
+            font-weight: 900 !important;
+            border: 2px solid var(--color-warning) !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px var(--color-button-menu-shadow) !important;
+        }
+
+        #comboText {
+            position: absolute;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--color-warning);
+            text-shadow: 0 0 10px var(--color-warning);
+            animation: flyup 1.5s ease-out forwards;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        @keyframes flyup {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100px) scale(0.5); opacity: 0; }
+        }
+        
+    </style>
+</head>
+<body class="theme-dark">
+
+    <div class="game-container">
+        <div class="header w-full">
+            <h1>BLOCK LINK</h1>
+            <!-- Removed the instructional text as requested -->
+        </div>
+        
+        <div class="game-area w-full flex-col items-center">
+            
+            <!-- Simplified In-Game Info Bar -->
+            <div id="gameInfoBar" class="flex justify-between items-center" style="display: none;">
+                <span class="text-xl font-bold">Score: <span id="currentScore">0</span></span>
+                <!-- Adjusted Home button style slightly for better contrast without a background box -->
+                <button id="homeBtn" class="btn text-sm py-1 px-3">Home</button>
+            </div>
+            
+            <!-- Main Canvas (Starts hidden) -->
+            <canvas id="gameCanvas" style="display: none;"></canvas>
+            
+        </div>
+    </div>
+
+    <!-- Generic Game Modal for Menus and Game Over -->
+    <div id="gameModal" class="fixed inset-0 flex justify-center items-center z-50 transition-opacity duration-300">
+        <div id="modalContentContainer" class="modal-background p-8 rounded-xl shadow-2xl max-w-lg w-full">
+            
+            <!-- === Main Menu Content (Home Screen) === -->
+            <div id="mainMenuContent" class="modal-screen">
+                <h2 class="text-3xl font-bold mb-8 text-center">Home</h2>
+                <div class="flex flex-col gap-4">
+                    <button id="mainMenuPlayBtn" class="btn text-2xl py-4">Classic Mode</button>
+                    <button id="mainMenuSettingsBtn" class="btn btn-menu text-xl py-4">Settings</button>
+                </div>
+                <!-- Displaying only the High Score -->
+                <div class="text-sm text-center mt-6 opacity-75">
+                    High Score: <span id="highScore">0</span>
+                </div>
+            </div>
+
+            <!-- === Settings Content === -->
+            <div id="settingsContent" class="modal-screen hidden">
+                <h2 class="text-3xl font-bold mb-6 text-center">Settings</h2>
+                
+                <div class="flex flex-col gap-6 text-lg mb-8">
+                    
+                    <!-- Sound Toggle -->
+                    <div class="flex justify-between items-center bg-black bg-opacity-20 p-3 rounded-lg">
+                        <span>Sound Effects:</span>
+                        <div id="soundToggle" class="toggle-switch"></div>
+                    </div>
+
+                    <!-- Vibration Toggle (Mobile Accessibility) -->
+                    <div class="flex justify-between items-center bg-black bg-opacity-20 p-3 rounded-lg">
+                        <span>Vibration Feedback:</span>
+                        <div id="vibrationToggle" class="toggle-switch"></div>
+                    </div>
+
+                    <!-- Theme Selection -->
+                    <div class="flex flex-col">
+                        <label class="font-bold mb-2 text-yellow-300">Color Theme:</label>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            <button id="theme-dark-btn" class="btn btn-menu py-2 text-sm" data-theme="dark">Dark Mode</button>
+                            <button id="theme-light-btn" class="btn btn-menu py-2 text-sm" data-theme="light">Light Mode</button>
+                            <button id="theme-forest-btn" class="btn btn-menu py-2 text-sm" data-theme="forest">Forest</button>
+                            <button id="theme-upside-down-btn" class="btn btn-menu py-2 text-sm" data-theme="upside-down">Upside Down</button>
+                            <button id="theme-ocean-btn" class="btn btn-menu py-2 text-sm" data-theme="ocean">Ocean</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Help Button -->
+                    <button id="helpBtn" class="btn btn-menu">How to Play</button>
+                    
+                </div>
+                
+                <button id="settingsBackBtn" class="btn btn-menu w-full mt-4">Back to Home</button>
+            </div>
+            
+            <!-- === Help Content Modal === -->
+            <div id="helpContent" class="modal-screen hidden">
+                <h2 class="text-3xl font-bold mb-6 text-center">How to Play</h2>
+                <div class="text-sm space-y-4 opacity-80">
+                    <p>The goal of Block Link is to clear colored blocks by linking them together.</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li><span class="font-bold text-yellow-300">Linking:</span> Tap or click a block and drag your finger/mouse across neighboring blocks of the *same color*.</li>
+                        <li><span class="font-bold text-yellow-300">Movement:</span> Links must be horizontal or vertical (not diagonal).</li>
+                        <li><span class="font-bold text-yellow-300">Clearing:</span> A link must contain a minimum of **3** blocks to clear.</li>
+                        <li><span class="font-bold text-yellow-300">Gravity:</span> Cleared blocks disappear, and the blocks above fall down. New blocks fill in from the top.</li>
+                        <li><span class="font-bold text-red-400">Game Over:</span> The game ends when there are no more possible links of 3 or more blocks remaining on the board.</li>
+                    </ul>
+                </div>
+                <button id="helpBackBtn" class="btn btn-menu w-full mt-6">Got It!</button>
+            </div>
+
+            <!-- === Game Over Content === -->
+            <div id="gameOverContent" class="modal-screen hidden">
+                <h2 class="text-3xl font-bold text-red-400 mb-3 text-center">Game Over</h2>
+                <p id="finalScoreText" class="text-lg mb-5 opacity-80"></p>
+                <button id="gameOverPlayAgainBtn" class="btn w-full">Play Again</button>
+                <button id="gameOverMenuBtn" class="btn btn-menu mt-2 w-full">Home</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set Firebase Log Level
+        setLogLevel('debug');
+
+        // --- GLOBAL VARIABLES & CONSTANTS ---
+        const GRID_SIZE = 8;
+        const BLOCK_SIZE = 60; 
+        const CANVAS_SIZE = GRID_SIZE * BLOCK_SIZE;
+        const COLOR_MAP = [
+            '#4A90E2', // Blue
+            '#50E3C2', // Teal
+            '#F5A623', // Orange
+            '#D0021B', // Red
+            '#9013FE', // Purple
+            '#F8E71C'  // Yellow
+        ];
+        const MIN_PATH_LENGTH = 3;
+
+        // Core Game State
+        let board = [];
+        let score = 0;
+        let highScore = 0;
+        let totalCleared = 0;
+        let isGameOver = false;
+        let isLinking = false;
+        let selectedPath = []; 
+        let selectedColorIndex = 0; 
+        
+        // Settings State
+        let settings = {
+            theme: 'dark',
+            vibration: false,
+            soundEnabled: true // New setting for sound control
+        };
+
+        // Canvas & Contexts
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = CANVAS_SIZE;
+        canvas.height = CANVAS_SIZE;
+
+        // DOM Elements
+        const currentScoreDisplay = document.getElementById('currentScore');
+        const highScoreDisplay = document.getElementById('highScore');
+        const gameCanvas = document.getElementById('gameCanvas');
+        const gameInfoBar = document.getElementById('gameInfoBar');
+
+        // Modal Elements
+        const gameModal = document.getElementById('gameModal');
+        const finalScoreText = document.getElementById('finalScoreText');
+        const vibrationToggle = document.getElementById('vibrationToggle');
+        const soundToggle = document.getElementById('soundToggle'); // New DOM element reference
+        const body = document.body;
+
+        const modalScreens = {
+            main: document.getElementById('mainMenuContent'),
+            settings: document.getElementById('settingsContent'),
+            game_over: document.getElementById('gameOverContent'),
+            help: document.getElementById('helpContent')
+        };
+
+
+        // --- FIREBASE & AUTH SETUP ---
+        let db, auth;
+        let userId = 'anon';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const HIGH_SCORE_PATH = `/artifacts/${appId}/public/data/highscores/global`;
+
+        // --- TONE.JS AUDIO SETUP ---
+        let selectSynth, clearSynth;
+
+        function setupAudio() {
+            // Sound for selection/linking (a short, soft pluck)
+            selectSynth = new Tone.PluckSynth({
+                attackNoise: 0.5, // Reduced for softer, less sharp attack
+                dampening: 5000,  // Increased for faster, softer decay
+                resonance: 0.7
+            }).toDestination();
+
+            // Sound for clearing (a quick arpeggio/chime)
+            clearSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "sine" },
+                envelope: {
+                    attack: 0.005,
+                    decay: 0.2,
+                    sustain: 0.05,
+                    release: 0.5
+                }
+            }).toDestination();
+        }
+
+        function playSelectSound() {
+            if (!settings.soundEnabled) return; // Check if sound is enabled
+            if (Tone.context.state === 'running') {
+                // Trigger note with reduced velocity (0.6) for a much softer volume
+                selectSynth.triggerAttackRelease("C5", "16n", Tone.now(), 0.6); 
+            }
+        }
+
+        function playClearSound(count) {
+            if (!settings.soundEnabled) return; // Check if sound is enabled
+            if (Tone.context.state !== 'running') return;
+            
+            // Define notes for a rising arpeggio, scaling slightly with combo
+            const root = count >= 5 ? "C4" : (count >= 4 ? "D4" : "E4");
+            const pattern = [root, Tone.Midi(Tone.Frequency(root).toMidi() + 4).toNote(), Tone.Midi(Tone.Frequency(root).toMidi() + 7).toNote(), Tone.Midi(Tone.Frequency(root).toMidi() + 12).toNote()];
+            const notes = pattern.slice(0, Math.min(count - 1, pattern.length)); // Base 3 clear gets 2 notes
+
+            let time = Tone.now();
+            notes.forEach((note, index) => {
+                clearSynth.triggerAttackRelease(note, "16n", time + index * 0.06);
+            });
+        }
+        
+        // Initialize audio synths
+        setupAudio();
+
+
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        listenForHighScores();
+                        
+                        // Set canvas sizes and load local settings
+                        canvas.style.maxWidth = `${CANVAS_SIZE}px`;
+                        gameInfoBar.style.maxWidth = `${CANVAS_SIZE}px`;
+                        loadSettings();
+                        showScreen('main'); // Start on the Home Screen
+                    } else {
+                        highScoreDisplay.textContent = 'N/A';
+                        loadSettings();
+                        showScreen('main'); 
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                highScoreDisplay.textContent = 'N/A';
+                loadSettings();
+                showScreen('main'); 
+            }
+        }
+
+        // --- FIREBASE DATA FUNCTIONS (PUBLIC) ---
+
+        function listenForHighScores() {
+            if (!db) return;
+            const docRef = doc(db, HIGH_SCORE_PATH);
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    highScore = data.highScore || 0;
+                    highScoreDisplay.textContent = highScore.toLocaleString();
+                }
+            }, (error) => {
+                console.error("Error listening to high score:", error);
+            });
+        }
+
+        async function updateHighScore() {
+            if (!db || !userId) return;
+
+            if (score > highScore) {
+                highScore = score;
+                highScoreDisplay.textContent = highScore.toLocaleString();
+                
+                const docRef = doc(db, HIGH_SCORE_PATH);
+                const newScoreData = {
+                    highScore: highScore,
+                    userId: userId,
+                    timestamp: new Date()
+                };
+
+                try {
+                    await setDoc(docRef, newScoreData, { merge: true });
+                    console.log("High score updated successfully:", highScore);
+                } catch (e) {
+                    console.error("Error updating high score:", e);
+                }
+            }
+        }
+        
+        // --- SETTINGS MANAGEMENT ---
+
+        function saveSettings() {
+            try {
+                localStorage.setItem('blockLinkSettings', JSON.stringify(settings));
+            } catch (e) {
+                console.error("Could not save settings to localStorage:", e);
+            }
+        }
+
+        function loadSettings() {
+            try {
+                const storedSettings = localStorage.getItem('blockLinkSettings');
+                if (storedSettings) {
+                    settings = JSON.parse(storedSettings);
+                }
+            } catch (e) {
+                console.error("Could not load settings from localStorage:", e);
+            }
+
+            // Ensure soundEnabled is set if it was missing in old config
+            if (typeof settings.soundEnabled === 'undefined') {
+                settings.soundEnabled = true;
+            }
+
+            applyTheme(settings.theme);
+            updateVibrationToggleUI(settings.vibration);
+            updateSoundToggleUI(settings.soundEnabled); // Initialize sound toggle UI
+        }
+        
+        function updateSoundToggleUI(isActive) {
+            if (isActive) {
+                soundToggle.classList.add('active');
+            } else {
+                soundToggle.classList.remove('active');
+            }
+        }
+
+        function toggleSound() {
+            settings.soundEnabled = !settings.soundEnabled;
+            updateSoundToggleUI(settings.soundEnabled);
+            saveSettings();
+        }
+
+        function applyTheme(themeName) {
+            body.className = '';
+            body.classList.add(`theme-${themeName}`);
+            settings.theme = themeName;
+            saveSettings();
+            
+            // Highlight the active theme button
+            document.querySelectorAll('#settingsContent .btn[data-theme]').forEach(btn => {
+                btn.classList.remove('active-theme');
+                if (btn.dataset.theme === themeName) {
+                    btn.classList.add('active-theme');
+                }
+            });
+        }
+        
+        function updateVibrationToggleUI(isActive) {
+            if (isActive) {
+                vibrationToggle.classList.add('active');
+            } else {
+                vibrationToggle.classList.remove('active');
+            }
+        }
+
+        function toggleVibration() {
+            settings.vibration = !settings.vibration;
+            updateVibrationToggleUI(settings.vibration);
+            saveSettings();
+            if (settings.vibration) {
+                triggerVibration(20);
+            }
+        }
+
+        function triggerVibration(duration = 100) {
+            if (settings.vibration && 'vibrate' in navigator) {
+                navigator.vibrate(duration);
+            }
+        }
+
+        // --- UI & GAME FLOW CONTROL ---
+
+        /**
+         * Switches the current view between the game and the various modal screens.
+         * @param {string} screenName 'main', 'settings', 'game_over', 'help', or 'game'.
+         */
+        function showScreen(screenName) {
+            // 1. Hide all modal screens
+            Object.values(modalScreens).forEach(el => el.classList.add('hidden'));
+
+            if (screenName !== 'game') {
+                // Showing a menu/game over: Show modal, hide game elements
+                gameModal.style.visibility = 'visible';
+                gameModal.style.opacity = '0';
+                setTimeout(() => gameModal.style.opacity = '1', 10);
+                gameCanvas.style.display = 'none';
+                gameInfoBar.style.display = 'none';
+                
+                const screenEl = modalScreens[screenName];
+                if (screenEl) {
+                    screenEl.classList.remove('hidden');
+                }
+            } else {
+                // Showing the game: Hide modal, show game elements
+                gameModal.style.opacity = '0';
+                setTimeout(() => {
+                    gameModal.style.visibility = 'hidden';
+                }, 300);
+                gameCanvas.style.display = 'block';
+                gameInfoBar.style.display = 'flex';
+                initGame(); // Start the core game logic
+            }
+        }
+
+
+        // --- GAME LOGIC FUNCTIONS ---
+
+        function initGame() {
+            score = 0;
+            totalCleared = 0;
+            isGameOver = false;
+            selectedPath = [];
+            isLinking = false;
+            
+            // Fill the board randomly
+            board = Array(GRID_SIZE).fill(0).map(() => 
+                Array(GRID_SIZE).fill(0).map(() => Math.floor(Math.random() * COLOR_MAP.length) + 1)
+            );
+            
+            updateScoreDisplay();
+            drawGame();
+        }
+
+        function endGame() {
+            isGameOver = true;
+            finalScoreText.textContent = `You achieved a final score of ${score.toLocaleString()}.`;
+            updateHighScore();
+            triggerVibration(500); // Long vibration on game over
+            showScreen('game_over');
+        }
+
+        /**
+         * Checks the entire board for any possible valid move (path of MIN_PATH_LENGTH).
+         * Uses a Depth First Search (DFS) helper.
+         */
+        function checkPossibleMoves() {
+            
+            function canFindPath(x, y, color, currentLength, visited) {
+                if (currentLength >= MIN_PATH_LENGTH) return true;
+                
+                visited[y][x] = true; 
+                const neighbors = [{ dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 }];
+
+                for (const { dx, dy } of neighbors) {
+                    const nextX = x + dx;
+                    const nextY = y + dy;
+
+                    if (nextX >= 0 && nextX < GRID_SIZE && nextY >= 0 && nextY < GRID_SIZE &&
+                        board[nextY][nextX] === color && !visited[nextY][nextX]) {
+                        
+                        if (canFindPath(nextX, nextY, color, currentLength + 1, visited)) {
+                            return true;
+                        }
+                    }
+                }
+                
+                visited[y][x] = false; 
+                return false;
+            }
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const color = board[y][x];
+                    if (color === 0) continue; 
+
+                    let visited = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(false));
+                    
+                    if (canFindPath(x, y, color, 1, visited)) {
+                        return true; 
+                    }
+                }
+            }
+            return false; 
+        }
+
+        function updateScoreDisplay() {
+            currentScoreDisplay.textContent = score.toLocaleString();
+        }
+
+        /**
+         * Converts mouse/touch position (relative to canvas) to grid coordinates.
+         */
+        function getGridCoordinates(canvasX, canvasY) {
+            const gridX = Math.floor(canvasX / BLOCK_SIZE);
+            const gridY = Math.floor(canvasY / BLOCK_SIZE);
+
+            if (gridX >= 0 && gridX < GRID_SIZE && gridY >= 0 && gridY < GRID_SIZE) {
+                return { x: gridX, y: gridY };
+            }
+            return null;
+        }
+        
+        /**
+         * Checks if the new cell (x2, y2) is adjacent ONLY horizontally or vertically
+         * to the last cell in the path (x1, y1).
+         */
+        function isAdjacent(x1, y1, x2, y2) {
+            const dx = Math.abs(x1 - x2);
+            const dy = Math.abs(y1 - y2);
+            return dx + dy === 1;
+        }
+
+        function onLinkStart(e) {
+            if (isGameOver || gameCanvas.style.display === 'none') return;
+            e.preventDefault();
+
+            const pos = getCanvasCoordinates(e); 
+            const coords = getGridCoordinates(pos.x, pos.y);
+
+            if (coords) {
+                const colorIndex = board[coords.y][coords.x];
+                if (colorIndex !== 0) {
+                    isLinking = true;
+                    selectedColorIndex = colorIndex;
+                    selectedPath = [{ x: coords.x, y: coords.y }];
+                    drawGame();
+                }
+            }
+        }
+        
+        function onLinkMove(e) {
+            if (!isLinking || isGameOver) return;
+            e.preventDefault();
+
+            const pos = getCanvasCoordinates(e); 
+            const coords = getGridCoordinates(pos.x, pos.y);
+
+            if (coords) {
+                const { x, y } = coords;
+                const colorIndex = board[y][x];
+                const lastCell = selectedPath[selectedPath.length - 1];
+
+                if (colorIndex !== selectedColorIndex) {
+                    return;
+                }
+
+                if (!isAdjacent(lastCell.x, lastCell.y, x, y)) {
+                    return;
+                }
+
+                const newCell = { x, y };
+                const existingIndex = selectedPath.findIndex(p => p.x === x && p.y === y);
+
+                if (existingIndex !== -1) {
+                    if (existingIndex === selectedPath.length - 2) {
+                        selectedPath.pop();
+                        playSelectSound(); // Sound on backtracking
+                    }
+                } else {
+                    selectedPath.push(newCell);
+                    playSelectSound(); // Sound on adding new cell
+                }
+
+                drawGame();
+            }
+        }
+
+        function onLinkEnd(e) {
+            if (!isLinking || isGameOver) return;
+            e.preventDefault();
+
+            isLinking = false;
+            
+            if (selectedPath.length >= MIN_PATH_LENGTH) {
+                clearAndRefill();
+            } else {
+                selectedPath = [];
+                drawGame();
+            }
+        }
+
+        async function clearAndRefill() {
+            const clearedCount = selectedPath.length;
+            score += clearedCount * 10 * clearedCount; 
+            totalCleared += clearedCount;
+            updateScoreDisplay();
+            showComboText(clearedCount);
+            triggerVibration(50); // Short vibration on clear
+            playClearSound(clearedCount); // Play clear sound
+
+            selectedPath.forEach(({ x, y }) => {
+                board[y][x] = 0;
+            });
+            selectedPath = [];
+            drawGame();
+            
+            await new Promise(resolve => setTimeout(resolve, 150)); 
+
+            applyGravity();
+            drawGame();
+
+            if (!checkPossibleMoves()) {
+                endGame();
+            }
+        }
+
+
+        function applyGravity() {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                let emptyCells = []; 
+                
+                for (let y = GRID_SIZE - 1; y >= 0; y--) {
+                    if (board[y][x] === 0) {
+                        emptyCells.push(y);
+                    } else if (emptyCells.length > 0) {
+                        const newY = emptyCells.shift();
+                        board[newY][x] = board[y][x];
+                        board[y][x] = 0;
+                        emptyCells.push(y); 
+                    }
+                }
+
+                emptyCells.forEach(y => {
+                    board[y][x] = Math.floor(Math.random() * COLOR_MAP.length) + 1;
+                });
+            }
+        }
+
+        function showComboText(count) {
+            const text = `${count} CLEARED!`;
+            const comboEl = document.createElement('div');
+            comboEl.id = 'comboText';
+            comboEl.textContent = text;
+            
+            const rect = canvas.getBoundingClientRect();
+            
+            comboEl.style.left = `${rect.left + rect.width / 2}px`;
+            comboEl.style.top = `${rect.top + rect.height / 2}px`;
+            
+            document.body.appendChild(comboEl);
+
+            setTimeout(() => {
+                comboEl.remove();
+            }, 1500);
+        }
+
+        // --- RENDERING FUNCTIONS ---
+
+        function drawBlockCell(ctx, x, y, colorIndex, isSelected = false) {
+            if (colorIndex === 0) return;
+            const color = COLOR_MAP[colorIndex - 1];
+            
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = color;
+            
+            ctx.strokeStyle = 'transparent';
+            ctx.lineWidth = 0;
+            ctx.shadowBlur = 0;
+
+            const padding = 5;
+            const drawSize = BLOCK_SIZE - 2 * padding;
+            const drawX = x * BLOCK_SIZE + padding;
+            const drawY = y * BLOCK_SIZE + padding;
+            const radius = 8;
+            
+            if (isSelected) {
+                // Apply a glow/border when selected
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
+                ctx.strokeStyle = 'var(--color-canvas-bg)'; // Use canvas color as a subtle border for contrast
+                ctx.lineWidth = 4; 
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(drawX + radius, drawY);
+            ctx.lineTo(drawX + drawSize - radius, drawY);
+            ctx.arc(drawX + drawSize - radius, drawY + radius, radius, 1.5 * Math.PI, 2 * Math.PI);
+            ctx.lineTo(drawX + drawSize, drawY + drawSize - radius);
+            ctx.arc(drawX + drawSize - radius, drawY + drawSize - radius, radius, 0, 0.5 * Math.PI);
+            ctx.lineTo(drawX + radius, drawY + drawSize);
+            ctx.arc(drawX + radius, drawY + drawSize - radius, radius, 0.5 * Math.PI, Math.PI);
+            ctx.lineTo(drawX, drawY + radius);
+            ctx.arc(drawX + radius, drawY + radius, radius, Math.PI, 1.5 * Math.PI);
+            ctx.closePath();
+            
+            ctx.fill();
+            
+            if (isSelected) {
+                ctx.stroke();
+            }
+            
+            ctx.shadowBlur = 0; // Reset shadow for next draws
+            ctx.lineWidth = 1; // Reset line width
+        }
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            
+            // Draw inner grid lines only (no edge line now that border is removed)
+            ctx.strokeStyle = 'var(--color-grid-line)';
+            ctx.lineWidth = 1;
+            for (let i = 1; i < GRID_SIZE; i++) {
+                // Vertical lines
+                ctx.beginPath();
+                ctx.moveTo(i * BLOCK_SIZE, 0);
+                ctx.lineTo(i * BLOCK_SIZE, CANVAS_SIZE);
+                ctx.stroke();
+                
+                // Horizontal lines
+                ctx.beginPath();
+                ctx.moveTo(0, i * BLOCK_SIZE);
+                ctx.lineTo(CANVAS_SIZE, i * BLOCK_SIZE);
+                ctx.stroke();
+            }
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const isCellSelected = selectedPath.some(p => p.x === x && p.y === y);
+                    drawBlockCell(ctx, x, y, board[y][x], isCellSelected);
+                }
+            }
+        }
+
+        function drawSelectionPath() {
+            if (selectedPath.length < 2) return;
+
+            ctx.lineWidth = 10;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = COLOR_MAP[selectedColorIndex - 1];
+            ctx.shadowColor = ctx.strokeStyle;
+            ctx.shadowBlur = 15;
+            
+            ctx.beginPath();
+            
+            const center = (x, y) => ({
+                cx: x * BLOCK_SIZE + BLOCK_SIZE / 2,
+                cy: y * BLOCK_SIZE + BLOCK_SIZE / 2,
+            });
+
+            const start = center(selectedPath[0].x, selectedPath[0].y);
+            ctx.moveTo(start.cx, start.cy);
+
+            for (let i = 1; i < selectedPath.length; i++) {
+                const next = center(selectedPath[i].x, selectedPath[i].y);
+                ctx.lineTo(next.cx, next.cy);
+            }
+
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawGame() {
+            drawGrid();
+            drawSelectionPath();
+        }
+
+        // --- INPUT HANDLING UTILITY ---
+
+        /**
+         * Calculates the mouse/touch position relative to the canvas's top-left corner.
+         */
+        function getCanvasCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Handle touch events
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+
+        // --- EVENT LISTENERS ---
+
+        function addEventListeners() {
+            // Game Input Events
+            canvas.addEventListener('mousedown', onLinkStart);
+            window.addEventListener('mousemove', onLinkMove);
+            window.addEventListener('mouseup', onLinkEnd);
+            canvas.addEventListener('touchstart', onLinkStart);
+            window.addEventListener('touchmove', onLinkMove);
+            canvas.addEventListener('touchend', onLinkEnd);
+
+            // --- Menu Navigation Listeners ---
+            document.getElementById('mainMenuPlayBtn').addEventListener('click', () => {
+                // Start audio context on user interaction
+                if (Tone.context.state !== 'running') {
+                    Tone.start().then(() => {
+                        console.log("Audio context started.");
+                    });
+                }
+                showScreen('game');
+            });
+
+            document.getElementById('mainMenuSettingsBtn').addEventListener('click', () => showScreen('settings'));
+            document.getElementById('homeBtn').addEventListener('click', () => showScreen('main')); 
+            document.getElementById('settingsBackBtn').addEventListener('click', () => showScreen('main'));
+            document.getElementById('gameOverPlayAgainBtn').addEventListener('click', () => showScreen('game'));
+            document.getElementById('gameOverMenuBtn').addEventListener('click', () => showScreen('main'));
+            
+            // Settings Controls
+            document.getElementById('helpBtn').addEventListener('click', () => showScreen('help'));
+            document.getElementById('helpBackBtn').addEventListener('click', () => showScreen('settings'));
+
+            // Theme Buttons
+            document.getElementById('theme-dark-btn').addEventListener('click', () => applyTheme('dark'));
+            document.getElementById('theme-light-btn').addEventListener('click', () => applyTheme('light'));
+            document.getElementById('theme-forest-btn').addEventListener('click', () => applyTheme('forest'));
+            document.getElementById('theme-upside-down-btn').addEventListener('click', () => applyTheme('upside-down'));
+            document.getElementById('theme-ocean-btn').addEventListener('click', () => applyTheme('ocean'));
+
+            // Vibration Toggle
+            vibrationToggle.addEventListener('click', toggleVibration);
+            
+            // Sound Toggle (New)
+            soundToggle.addEventListener('click', toggleSound);
+        }
+
+        // --- GAME START ---
+        
+        initializeFirebase();
+        addEventListeners();
+
+    </script>
+</body>
+</html>
